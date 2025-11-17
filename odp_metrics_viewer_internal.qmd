@@ -24,7 +24,7 @@ library(tidyr)
 
 theme_set(theme_light())
 
-dat_all <- readRDS(here("data/historical_access.RDS"))
+dat_all <- readRDS(here("data/historical_access.RDS")) 
 
 pal <- c("#063E4D", "#62AECA")
 
@@ -79,12 +79,17 @@ plotlyOutput("fig2")
 
 ::: {.card padding=0px}
 ```{r}
-bslib::value_box(
-  title = "Total Number of Views:",
-  showcase = bs_icon("eye"),
-  value = "Test for Now",
-  theme = value_box_theme(bg = "#62AECA", fg = "#063E4D")
-)
+
+uiOutput("value_box_total")
+
+#textOutput("box_icon")
+
+# bslib::value_box(
+#   title = textOutput("box_title"),
+#   showcase = bs_icon(bx),
+#   value = textOutput("box_value"),
+#   theme = value_box_theme(bg = "#62AECA", fg = "#063E4D")
+# )
 ```
 :::
 
@@ -107,7 +112,7 @@ dat <- reactive({
 output$fig1 <- renderPlotly({
   
   plot_title <- paste0(
-    "Total Number of ",
+    "Number of ",
     input$data_branch, " ",
     input$data_product, "\n", 
     input$access_type, "s by ",
@@ -129,10 +134,25 @@ output$fig1 <- renderPlotly({
       panel.grid.major.y = element_blank(),
       axis.title.y = element_blank()
     )
-  ggplotly(p)
+  
+  ggplotly(p) %>% 
+    config(
+      modeBarButtonsToRemove = list("toggleSpikelines", "autoScale2d"),
+      displaylogo = FALSE,
+      toImageButtonOptions = list(
+        format = "png",
+        filename = paste(
+          "total",
+          input$data_branch, 
+          input$data_product, 
+          input$access_type,  
+          input$user_segment,
+          sep = "_"),
+        width = 600, height = 800
+      ))
 })
 
-
+# could make this daily
 output$fig2 <- renderPlotly({
   plot_title <- paste0(
     "Cumulative number of ",
@@ -141,7 +161,6 @@ output$fig2 <- renderPlotly({
     input$access_type, "s by ",
     input$user_segment, " users"
   )
-  
   
   dat_plot <- dat() %>%
     arrange(timestamp_ns) %>% 
@@ -153,17 +172,82 @@ output$fig2 <- renderPlotly({
   pal <- get_pal(length(unique(dat_plot$asset_name)))
   
   p <- ggplot(
-    dat_plot, aes(timestamp_ns, n, col = asset_name, group = asset_name)
+    dat_plot, 
+    aes(timestamp_ns, n, col = asset_name, group = asset_name,
+        text = paste(
+          "asset_name: ", asset_name, "\n",
+          "timestamp: ", timestamp_ns, "\n",
+          "cumulative number: ", n
+        ))
   ) +
     geom_line(linewidth = 1) +
     scale_y_continuous("Cumulative Number") +
     scale_colour_manual("Asset", values = pal) +
     labs(title = plot_title) +
-    theme(
-      axis.title.x = element_blank()
-    )
+    theme(axis.title.x = element_blank())
   
-  ggplotly(p)
+  ggplotly(p, tooltip = "text") %>% 
+    config(
+      modeBarButtonsToRemove = list("toggleSpikelines", "autoScale2d"),
+      displaylogo = FALSE,
+      toImageButtonOptions = list(
+        format = "png",
+        filename = paste(
+          "cumulative",
+          input$data_branch, 
+          input$data_product, 
+          input$access_type,  
+          input$user_segment,
+          sep = "_"),
+        width = 1200, height = 600
+      ))
+})
+
+#####################################################
+###### VALUE BOX ####################################
+#####################################################
+box_title <- reactive({
+  box_title <- paste0(
+    "Total ",
+    input$data_branch, " ",
+    input$data_product, "\n", 
+    input$access_type, "s by ",
+    input$user_segment, " users:"
+  )
+  
+ return(box_title)
+})
+
+box_value <- reactive({
+  
+  n <- dat() %>% 
+    summarise(n = sum(value)) %>% 
+    pull(n)
+
+  n <- format(n, big.mark = ",")
+  return(n)
+})
+
+box_icon <- reactive({
+  
+  if(grepl("view", input$access_type)) {
+    box_icon <- "eye"
+  } else if(grepl("download", input$access_type)) {
+    box_icon <- "box-arrow-down"
+  } else box_icon <- "book"
+  
+  return(box_icon)
+})
+
+output$value_box_total <- renderUI({
+  
+  bslib::value_box(
+    title = box_title(),
+    showcase = bs_icon(box_icon()),
+    value = box_value(),
+    theme = value_box_theme(bg = "#62AECA", fg = "#063E4D")
+  )
+  
 })
 
 ```
