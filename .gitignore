@@ -3,8 +3,11 @@
 .RData
 .Ruserdata
 
+/archive
 /data-raw
+/rsconnect
 /R
 *html
+*internal_files
 
 config.yml
