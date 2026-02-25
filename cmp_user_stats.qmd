@@ -25,33 +25,10 @@ library(stringr)
 library(tidyr)
 
 source(here("functions/preprocess_user_stats.R"))
-#source("functions/preprocess_user_stats.R")
 
 theme_set(theme_light())
 
 #dat_all <- readRDS(here("data/historical_access.RDS")) 
-
-odp_api_config <- config::get(config = "default", file = "odp_api/config.yml")
-
-wq_metrics_url <- "https://data.novascotia.ca/api/v3/views/ktyz-sxuu/"
-adcp_metrics_url <- "https://data.novascotia.ca/api/v3/views/dv55-4vcp/"
-
-wq_metrics <- read.socrata(
-  wq_metrics_url,
-  app_token = odp_api_config$app_token,
-  email = odp_api_config$email,
-  password = odp_api_config$password
-) 
-
-adcp_metrics <- read.socrata(
-  adcp_metrics_url,
-  app_token = odp_api_config$app_token,
-  email = odp_api_config$email,
-  password = odp_api_config$password
-)
-
-dat_all <- bind_rows(wq_metrics, adcp_metrics) %>% 
-  preprocess_user_stats()
 
 pal <- c("#063E4D", "#62AECA")
 
@@ -59,34 +36,41 @@ pal <- c("#063E4D", "#62AECA")
 
 # Filters {.sidebar width=15% height=100%}
 
+**Download User Statistics**
+
+The User Statistics must be loaded at the beginning of each session. This may take
+30 - 60 seconds.
+
 ```{r}
 w <- '95%'
 
+actionButton("button", "Load Data", width = w, class = "btn-primary btn-lg")
+```
+<br>
+
+**Select Statistics**
+
+```{r}
 selectInput(
   "data_branch", "Select Data Branch", 
-  choices = unique(dat_all$program_branch),
+  #choices = unique(dat_all$program_branch),
+  choices = c("Current", "Water Quality", "Wave"),
   selected = "Water Quality"
 )
 
-# selectInput(
-#   "user_segment", "Select User", 
-#   choices = unique(dat_all$user_segment),
-#   selected = "anonymous"
-# )
-
 selectInput(
   "data_product", "Select Data Product", 
-  choices = unique(dat_all$data_product),
+  # choices = unique(dat_all$data_product),
+  choices = c("chart", "dataset", "map"),
   selected = "dataset"
 )
 
 selectInput(
   "access_type", "Select Access", 
-  choices = unique(dat_all$access_type),
+  #choices = unique(dat_all$access_type),
+  choices = c("API read", "download", "view"),
   selected = "download"
 )
-
-
 ```
 
 # Dashboard
@@ -117,11 +101,49 @@ uiOutput("value_box_total")
 ```{r}
 #| context: server
 
+dat_all <- eventReactive(input$button, {
+  
+  withProgress(
+    message = 'Loading data', 
+    detail = 'This may take a moment...', {
+      
+      odp_api_config <- config::get(config = "default", file = "odp_api/config.yml")
+      
+      wq_metrics_url <- "https://data.novascotia.ca/api/v3/views/ktyz-sxuu/"
+      adcp_metrics_url <- "https://data.novascotia.ca/api/v3/views/dv55-4vcp/"
+      
+      wq_metrics <- read.socrata(
+        wq_metrics_url,
+        app_token = odp_api_config$app_token,
+        email = odp_api_config$email,
+        password = odp_api_config$password
+      )
+      
+      incProgress(1/2, detail = "halfway there")
+      
+      adcp_metrics <- read.socrata(
+        adcp_metrics_url,
+        app_token = odp_api_config$app_token,
+        email = odp_api_config$email,
+        password = odp_api_config$password
+      )
+      
+      dat_all <- bind_rows(wq_metrics, adcp_metrics) %>%
+        preprocess_user_stats()
+      
+    })
+  
+  return(dat_all)
+  
+})
+
+
 dat <- reactive({
-  dat <- dat_all %>% 
+  req(dat_all())
+  
+  dat <- dat_all() %>% 
     filter(
       program_branch == input$data_branch,
-      #user_segment == input$user_segment,
       access_type == input$access_type,
       data_product == input$data_product
     ) 
@@ -136,7 +158,6 @@ output$fig1 <- renderPlotly({
     input$data_branch, " ",
     input$data_product, "\n", 
     input$access_type, "s"
-   # input$user_segment, " users"
   )
   
   dat_plot <- dat() %>% 
@@ -166,7 +187,6 @@ output$fig1 <- renderPlotly({
           input$data_branch, 
           input$data_product, 
           input$access_type,  
-        # input$user_segment,
           sep = "_"),
         width = 600, height = 800
       ))
@@ -177,9 +197,8 @@ output$fig2 <- renderPlotly({
   plot_title <- paste0(
     "Cumulative number of ",
     input$data_branch, " ",
-    input$data_product, "\n", 
+    input$data_product, " ",
     input$access_type, "s"
-    #input$user_segment, " users"
   )
   
   dat_plot <- dat() %>%
@@ -217,7 +236,6 @@ output$fig2 <- renderPlotly({
           input$data_branch, 
           input$data_product, 
           input$access_type,  
-          #input$user_segment,
           sep = "_"),
         width = 1200, height = 600
       ))
@@ -232,10 +250,9 @@ box_title <- reactive({
     input$data_branch, " ",
     input$data_product, "\n", 
     input$access_type, "s"
-  #  input$user_segment, " users:"
   )
   
- return(box_title)
+  return(box_title)
 })
 
 box_value <- reactive({

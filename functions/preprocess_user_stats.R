@@ -42,7 +42,7 @@ preprocess_user_stats <- function(dat) {
       ),
 
       access_type = case_when(
-        access_type %in%  access_views ~ "view",
+        access_type %in% access_views ~ "view",
         TRUE ~ access_type
       )
     ) %>%
