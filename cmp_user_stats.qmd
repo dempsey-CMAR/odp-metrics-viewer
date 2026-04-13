@@ -29,11 +29,21 @@ source(here("functions/preprocess_user_stats.R"))
 
 theme_set(theme_light())
 
-# dd_opts <- fread("data/2026-03-13_user_stats.csv", data.table = FALSE) %>% 
-#   preprocess_user_stats() %>% 
-#   distinct(program_branch, access_type, data_product)
-
 pal <- c("#063E4D", "#62AECA")
+
+# # temporary fix: downloaded data from api and save as csv file
+# odp_api_config <- config::get(config = "default", file = "odp_api/config.yml")
+# 
+# url <- "https://data.novascotia.ca/api/v3/views/ktyz-sxuu/"
+# 
+# dat_all <- read.socrata(
+#   url,
+#   app_token = odp_api_config$app_token,
+#   email = odp_api_config$email,
+#   password = odp_api_config$password
+# ) %>%
+#   preprocess_user_stats() %>%
+#   fwrite(here("data/cmp_user_stats.csv"))
 
 ```
 
@@ -41,7 +51,7 @@ pal <- c("#063E4D", "#62AECA")
 
 **Import User Statistics**
 
-The User Statistics must be loaded at the beginning of each session. Last updated: March 13, 2026.
+The User Statistics must be loaded at the beginning of each session. Last updated: April 7, 2026.
 
 ```{r}
 w <- '95%'
@@ -96,52 +106,11 @@ dat_all <- eventReactive(input$button, {
     message = 'Loading data', 
     detail = 'This may take a moment...', {
       
-      # odp_api_config <- config::get(config = "default", file = "odp_api/config.yml")
-      # 
-      # url <- "https://data.novascotia.ca/api/v3/views/ktyz-sxuu/"
-      # 
-      # dat_all <- read.socrata(
-      #   url,
-      #   app_token = odp_api_config$app_token,
-      #   email = odp_api_config$email,
-      #   password = odp_api_config$password
-      # ) %>%
-      #   preprocess_user_stats()
-      
-      dat_all <- fread("data/2026-03-13_user_stats.csv", data.table = FALSE) %>%
-        preprocess_user_stats()
+      dat_all <- fread("data/cmp_user_stats.csv", data.table = FALSE) 
     })
   
   return(dat_all)
 })
-
-# dat_branch <- reactive({
-#   req(input$data_branch)
-#   
-#   dat <- dat_all() %>% 
-#     filter(program_branch == input$data_branch) 
-#   
-#   return(dat)
-# })
-# 
-# dat_product <- reactive({
-#   req(input$data_product)
-#   
-#   dat <- dat_branch() %>% 
-#     filter(data_product == input$data_product) 
-# 
-#   return(dat)
-# })
-# 
-# 
-# dat_access <- reactive({
-#   req(input$access_type)
-#   
-#   dat <- dat_product() %>% 
-#     filter(access_type == input$access_type) 
-# 
-#   return(dat)
-# })
 
 dat <- reactive({
   req(dat_all())
