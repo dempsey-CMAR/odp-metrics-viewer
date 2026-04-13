@@ -9,5 +9,7 @@
 /R
 *html
 *internal_files
+*_files
+*csv
 
 config.yml
